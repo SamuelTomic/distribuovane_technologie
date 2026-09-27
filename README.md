@@ -1,5 +1,9 @@
 # distribuovane_technologie
 
+
+https://share.gemini.google/CuDLo9pfY5Tv
+
+
 Variant 2: Kontajnerizovaný distribuovaný IS
 Každý uzol bude obsahovať minimálne:
 •	kontajner webovej aplikácie alebo REST API, 
