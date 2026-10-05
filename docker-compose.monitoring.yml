@@ -1,0 +1,13 @@
+# Centrálne logovanie pre viac hostiteľov: Dozzle UI sa pripojí na agentov na každom uzle.
+# Na každom uzle: docker compose -f docker-compose.node.yml --env-file config/hosts/node-X.env --profile logging up -d
+# Centrálne (napr. na PC):  $env:DOZZLE_AGENTS="192.168.56.101:7007,192.168.56.102:7007,192.168.56.103:7007"
+#                           docker compose -f docker-compose.monitoring.yml up -d   → http://localhost:8099
+name: dt-monitoring
+
+services:
+  dozzle:
+    image: amir20/dozzle:${DOZZLE_VERSION:-v8.14.4}
+    environment:
+      DOZZLE_REMOTE_AGENT: ${DOZZLE_AGENTS:?Nastavte DOZZLE_AGENTS=ip1:7007,ip2:7007,ip3:7007}
+    ports: ["8099:8080"]
+    restart: unless-stopped

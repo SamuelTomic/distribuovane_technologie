@@ -1,0 +1,16 @@
+# Vstupný reverse proxy uzla (zverejňuje port). Je iba v privátnej sieti uzla,
+# takže odpojenie app/workera od replikačnej siete nezhodí používateľské rozhranie.
+server {
+    listen 80;
+    server_tokens off;
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $app http://${APP_HOST};
+
+    location / {
+        proxy_pass $app;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 60s;
+    }
+}

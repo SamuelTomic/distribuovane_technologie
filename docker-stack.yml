@@ -1,0 +1,211 @@
+# Docker Swarm – 3 uzly na 3 hostiteľoch (VM), komunikácia cez overlay sieť.
+# Príprava: docker swarm init / join, označenie hostiteľov štítkom dt_node=a|b|c,
+# image dt-node:1.0.0 zostavený na každom hostiteľovi. Nasadenie: scripts/deploy-swarm.sh
+#
+# Každý uzol je pripnutý (placement) na svoj hostiteľ, takže jeho MySQL volume je lokálny a trvalý.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+x-app-env: &app-env
+  DB_NAME: poruchy
+  DB_USER: app
+  DB_PASSWORD: ${DB_PASSWORD:?Chýba DB_PASSWORD}
+  REPLICATION_TOKEN: ${REPLICATION_TOKEN:?Chýba REPLICATION_TOKEN}
+  APP_VERSION: ${APP_VERSION:-1.0.0}
+
+x-app-health: &app-health
+  test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/health.php || exit 1"]
+  interval: 10s
+  timeout: 3s
+  retries: 5
+  start_period: 30s
+
+x-worker-health: &worker-health
+  test: ["CMD", "php", "/var/www/app/bin/healthcheck-worker.php"]
+  interval: 10s
+  timeout: 5s
+  retries: 3
+  start_period: 40s
+
+x-db-health: &db-health
+  test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+  interval: 5s
+  timeout: 3s
+  retries: 30
+  start_period: 30s
+
+x-restart: &restart
+  condition: any
+  delay: 5s
+
+services:
+  # ---------------- Uzol A (hostiteľ so štítkom dt_node=a) ----------------
+  node-a-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: poruchy
+      MYSQL_USER: app
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Chýba DB_ROOT_PASSWORD}
+    volumes: [node_a_db_data:/var/lib/mysql]
+    networks: [node-a-private]
+    healthcheck: *db-health
+    deploy: { placement: { constraints: [node.labels.dt_node == a] }, restart_policy: *restart }
+    logging: *logging
+  node-a-app:
+    image: dt-node:${APP_VERSION:-1.0.0}
+    environment:
+      <<: *app-env
+      NODE_ID: A
+      NODE_LABEL: Kino Bratislava
+      DB_HOST: node-a-db
+      PEER_NODES: B=http://node-b-app,C=http://node-c-app
+    networks: [node-a-private, replication]
+    healthcheck: *app-health
+    deploy: { placement: { constraints: [node.labels.dt_node == a] }, restart_policy: *restart }
+    logging: *logging
+  node-a-worker:
+    image: dt-node:${APP_VERSION:-1.0.0}
+    command: ["php", "/var/www/app/bin/worker.php"]
+    environment:
+      <<: *app-env
+      NODE_ID: A
+      DB_HOST: node-a-db
+      PEER_NODES: B=http://node-b-app,C=http://node-c-app
+    networks: [node-a-private, replication]
+    healthcheck: *worker-health
+    deploy: { placement: { constraints: [node.labels.dt_node == a] }, restart_policy: *restart }
+    logging: *logging
+  node-a-web:
+    image: nginx:1.27-alpine
+    environment: { APP_HOST: node-a-app }
+    configs:
+      - source: gateway_template
+        target: /etc/nginx/templates/default.conf.template
+    ports:
+      - { target: 80, published: 8080, protocol: tcp, mode: host }
+    networks: [node-a-private]
+    deploy: { placement: { constraints: [node.labels.dt_node == a] }, restart_policy: *restart }
+    logging: *logging
+
+  # ---------------- Uzol B (hostiteľ so štítkom dt_node=b) ----------------
+  node-b-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: poruchy
+      MYSQL_USER: app
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Chýba DB_ROOT_PASSWORD}
+    volumes: [node_b_db_data:/var/lib/mysql]
+    networks: [node-b-private]
+    healthcheck: *db-health
+    deploy: { placement: { constraints: [node.labels.dt_node == b] }, restart_policy: *restart }
+    logging: *logging
+  node-b-app:
+    image: dt-node:${APP_VERSION:-1.0.0}
+    environment:
+      <<: *app-env
+      NODE_ID: B
+      NODE_LABEL: Kino Košice
+      DB_HOST: node-b-db
+      PEER_NODES: A=http://node-a-app,C=http://node-c-app
+    networks: [node-b-private, replication]
+    healthcheck: *app-health
+    deploy: { placement: { constraints: [node.labels.dt_node == b] }, restart_policy: *restart }
+    logging: *logging
+  node-b-worker:
+    image: dt-node:${APP_VERSION:-1.0.0}
+    command: ["php", "/var/www/app/bin/worker.php"]
+    environment:
+      <<: *app-env
+      NODE_ID: B
+      DB_HOST: node-b-db
+      PEER_NODES: A=http://node-a-app,C=http://node-c-app
+    networks: [node-b-private, replication]
+    healthcheck: *worker-health
+    deploy: { placement: { constraints: [node.labels.dt_node == b] }, restart_policy: *restart }
+    logging: *logging
+  node-b-web:
+    image: nginx:1.27-alpine
+    environment: { APP_HOST: node-b-app }
+    configs:
+      - source: gateway_template
+        target: /etc/nginx/templates/default.conf.template
+    ports:
+      - { target: 80, published: 8080, protocol: tcp, mode: host }
+    networks: [node-b-private]
+    deploy: { placement: { constraints: [node.labels.dt_node == b] }, restart_policy: *restart }
+    logging: *logging
+
+  # ---------------- Uzol C (hostiteľ so štítkom dt_node=c) ----------------
+  node-c-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: poruchy
+      MYSQL_USER: app
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Chýba DB_ROOT_PASSWORD}
+    volumes: [node_c_db_data:/var/lib/mysql]
+    networks: [node-c-private]
+    healthcheck: *db-health
+    deploy: { placement: { constraints: [node.labels.dt_node == c] }, restart_policy: *restart }
+    logging: *logging
+  node-c-app:
+    image: dt-node:${APP_VERSION:-1.0.0}
+    environment:
+      <<: *app-env
+      NODE_ID: C
+      NODE_LABEL: Kino Žilina
+      DB_HOST: node-c-db
+      PEER_NODES: A=http://node-a-app,B=http://node-b-app
+    networks: [node-c-private, replication]
+    healthcheck: *app-health
+    deploy: { placement: { constraints: [node.labels.dt_node == c] }, restart_policy: *restart }
+    logging: *logging
+  node-c-worker:
+    image: dt-node:${APP_VERSION:-1.0.0}
+    command: ["php", "/var/www/app/bin/worker.php"]
+    environment:
+      <<: *app-env
+      NODE_ID: C
+      DB_HOST: node-c-db
+      PEER_NODES: A=http://node-a-app,B=http://node-b-app
+    networks: [node-c-private, replication]
+    healthcheck: *worker-health
+    deploy: { placement: { constraints: [node.labels.dt_node == c] }, restart_policy: *restart }
+    logging: *logging
+  node-c-web:
+    image: nginx:1.27-alpine
+    environment: { APP_HOST: node-c-app }
+    configs:
+      - source: gateway_template
+        target: /etc/nginx/templates/default.conf.template
+    ports:
+      - { target: 80, published: 8080, protocol: tcp, mode: host }
+    networks: [node-c-private]
+    deploy: { placement: { constraints: [node.labels.dt_node == c] }, restart_policy: *restart }
+    logging: *logging
+
+configs:
+  gateway_template:
+    file: ./docker/gateway.conf.template
+
+volumes:
+  node_a_db_data:
+  node_b_db_data:
+  node_c_db_data:
+
+networks:
+  replication:
+    driver: overlay
+    attachable: true
+  node-a-private:
+    driver: overlay
+  node-b-private:
+    driver: overlay
+  node-c-private:
+    driver: overlay

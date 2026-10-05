@@ -1,0 +1,7 @@
+.git
+.env
+_archive
+config
+scripts
+tests
+*.md

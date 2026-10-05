@@ -1,0 +1,5 @@
+.env
+config/hosts/*.env
+config/swarm/secrets.env
+!config/hosts/*.env.example
+_archive/

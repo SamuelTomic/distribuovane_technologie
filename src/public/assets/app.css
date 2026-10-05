@@ -1,0 +1,56 @@
+:root { color-scheme: light; --ink: #172b2b; --muted: #617370; --paper: #f5f7f3; --line: #d9e1dc; --teal: #176b61; --lime: #c7e58b; --red: #b23d36; --amber: #9a6b00; --green: #26814e; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+header { background: #173c38; color: #f6f7ee; padding: 18px max(20px, calc((100% - 1240px) / 2)); display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+header strong { font-size: 18px; }
+header span { color: var(--lime); font-size: 14px; }
+main { max-width: 1240px; margin: 24px auto; padding: 0 20px 48px; }
+h2 { margin: 0 0 14px; font-size: 18px; }
+h3 { margin: 26px 0 10px; font-size: 16px; }
+.muted { color: var(--muted); font-weight: 400; }
+.small { font-size: 13px; }
+section { border-top: 3px solid var(--teal); padding-top: 16px; }
+.panel { margin-bottom: 24px; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.panel-head h2 { margin: 0; }
+.actions { display: flex; align-items: center; gap: 10px; }
+.nodes { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.node { background: white; border: 1px solid var(--line); border-left: 5px solid var(--red); border-radius: 6px; padding: 12px 14px; font-size: 13px; }
+.node.online { border-left-color: var(--green); }
+.node.self { box-shadow: 0 0 0 2px var(--teal) inset; }
+.node h4 { margin: 0 0 6px; font-size: 15px; display: flex; justify-content: space-between; gap: 8px; }
+.node dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; }
+.node dt { color: var(--muted); }
+.node dd { margin: 0; overflow-wrap: anywhere; }
+.hash { font-family: Consolas, monospace; font-size: 12px; }
+.badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 650; background: #e3e8e5; }
+.badge.ok { background: #d8efdf; color: #1d5e37; }
+.badge.warn { background: #fbecc8; color: var(--amber); }
+.badge.bad { background: #fae0dc; color: var(--red); }
+.layout { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 32px; align-items: start; }
+label { display: block; margin: 14px 0 6px; font-weight: 600; font-size: 14px; }
+label.inline { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
+input:not([type=checkbox]), textarea, select { width: 100%; border: 1px solid #aebdb7; background: white; color: var(--ink); border-radius: 4px; padding: 9px 10px; font: inherit; }
+textarea { min-height: 100px; resize: vertical; }
+button { border: 0; border-radius: 4px; background: var(--teal); color: white; padding: 9px 14px; font: inherit; font-weight: 650; cursor: pointer; }
+button:hover { background: #0f5149; }
+button.secondary { background: #dcebc3; color: #23412e; }
+button.secondary:hover { background: #cde0ad; }
+button.link { background: none; color: var(--teal); padding: 2px 4px; font-weight: 600; }
+button.link.danger { color: var(--red); }
+button:disabled { opacity: .55; cursor: wait; }
+form button[type=submit] { margin-top: 14px; }
+.notice { padding: 10px 14px; margin: 0 0 18px; border-left: 4px solid var(--teal); background: #e6f0e9; }
+.notice.error { border-color: var(--red); background: #fae9e5; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); background: white; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+th, td { padding: 9px 10px; border-bottom: 1px solid #e4eae6; vertical-align: top; font-size: 13px; }
+th { background: #eaf0eb; white-space: nowrap; }
+tr.deleted td { color: var(--muted); text-decoration: line-through; }
+tr.deleted td:last-child { text-decoration: none; }
+td.nowrap { white-space: nowrap; }
+.empty { padding: 20px 10px; color: var(--muted); }
+dialog { border: 1px solid var(--line); border-radius: 8px; padding: 22px; width: min(460px, calc(100% - 32px)); }
+dialog::backdrop { background: rgba(23, 43, 43, .4); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 780px) { .layout { grid-template-columns: 1fr; } }
