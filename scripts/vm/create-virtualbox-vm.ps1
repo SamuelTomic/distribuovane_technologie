@@ -114,11 +114,11 @@ Write-Host "Vytváram VM $Name (bridged: $BridgeAdapter)..."
 VBox createvm --name $Name --ostype Ubuntu_64 --register --basefolder "$HOME\VirtualBox VMs" | Out-Null
 VBox modifyvm $Name --memory $MemoryMB --cpus $Cpus --ioapic on --firmware bios --graphicscontroller vmsvga --vram 16 `
     --audio-enabled off --usb off --boot1 disk --boot2 dvd --boot3 none --boot4 none `
-    --nic1 nat --macaddress1 080027D70001 --natpf1 'ssh,tcp,127.0.0.1,2222,,22' `
-    --nic2 hostonly --hostonlyadapter2 $HostOnlyAdapter --macaddress2 080027D70002 `
+    --nic1 nat --nictype1 virtio --macaddress1 080027D70001 --natpf1 'ssh,tcp,127.0.0.1,2222,,22' `
+    --nic2 hostonly --nictype2 virtio --hostonlyadapter2 $HostOnlyAdapter --macaddress2 080027D70002 `
     --uart1 0x3F8 4 --uartmode1 file (Join-Path $vmDir 'serial.log')
-if ($BridgeAdapter) { VBox modifyvm $Name --nic3 bridged --bridgeadapter3 $BridgeAdapter --macaddress3 080027D70003 }
-VBox storagectl $Name --name SATA --add sata --controller IntelAhci --portcount 2
+if ($BridgeAdapter) { VBox modifyvm $Name --nic3 bridged --nictype3 virtio --bridgeadapter3 $BridgeAdapter --macaddress3 080027D70003 }
+VBox storagectl $Name --name SATA --add sata --controller IntelAhci --portcount 2 --hostiocache on
 VBox storageattach $Name --storagectl SATA --port 0 --device 0 --type hdd --medium $disk
 VBox storageattach $Name --storagectl SATA --port 1 --device 0 --type dvddrive --medium (Join-Path $seedDir 'seed.iso')
 

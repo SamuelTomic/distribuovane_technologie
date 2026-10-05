@@ -190,9 +190,14 @@ Prihlásenie: `ssh -i ~/.ssh/dt_vm_ed25519 dt@192.168.56.20`, na konzole VM `dt`
 Po reštarte PC stačí spustiť Docker Desktop a VM (`VBoxManage startvm dt-node-b --type headless`).
 Kontajnery sa spustia samy (`restart: unless-stopped`).
 
-**Presun uzla C na druhý počítač:** vygenerujte konfiguráciu so skutočnými LAN adresami
-(`new-host-configs.ps1 -IpA <PC> -IpB <bridged IP VM> -IpC <druhý PC>`), na PC zastavte uzol C
-(`docker compose -f docker-compose.node.yml --env-file config\hosts\node-c.env down`) a znova nasaďte všetky tri uzly.
+**Uzol C na druhom počítači:** na tomto PC spustite `.\scripts\setup-three-hosts.ps1 -FriendIp <IP druhého PC>`.
+Skript urobí toto:
+
+* ponechá existujúci token aj DB heslá,
+* zastaví lokálny uzol C a prekonfiguruje uzol A,
+* sprístupní uzol B cez porty tohto PC (VirtualBox port forwarding, takže netreba bridged sieť),
+* vytvorí `config\hosts\node-c.env` pre druhý počítač.
+Postup pre druhý počítač je v [docs/uzol-c.md](docs/uzol-c.md).
 
 ### 5. Centrálne logy pre viac hostiteľov (voliteľné)
 

@@ -17,7 +17,19 @@ function New-Secret([int]$Bytes) {
     return ([BitConverter]::ToString($buffer) -replace '-', '').ToLower()
 }
 
-$token = New-Secret 32
+# Pri opakovanom spustení (napr. nové IP adresy) ponechá token aj DB heslá – MySQL volume už je
+# inicializovaný so starým heslom a ostatné uzly poznajú starý token.
+function Read-Existing([string]$Path) {
+    $values = @{}
+    if (Test-Path $Path) {
+        Get-Content $Path | Where-Object { $_ -match '^[A-Z_]+=' } | ForEach-Object { $k, $v = $_ -split '=', 2; $values[$k] = $v.Trim() }
+    }
+    return $values
+}
+$existing = @{}
+foreach ($n in 'a', 'b', 'c') { $existing[$n.ToUpper()] = Read-Existing "config/hosts/node-$n.env" }
+$token = ($existing.Values | ForEach-Object { $_.REPLICATION_TOKEN } | Where-Object { $_ } | Select-Object -First 1)
+if (-not $token) { $token = New-Secret 32 }
 $ips = [ordered]@{ A = $IpA; B = $IpB; C = $IpC }
 $labels = @{ A = 'Kino Bratislava'; B = 'Kino Košice'; C = 'Kino Žilina' }
 New-Item -ItemType Directory -Force config/hosts | Out-Null
@@ -44,8 +56,8 @@ foreach ($node in $ips.Keys) {
         'APP_VERSION=1.0.0'
         "# Token musí byť rovnaký na všetkých uzloch; DB heslá sú lokálne pre uzol."
         "REPLICATION_TOKEN=$token"
-        "DB_PASSWORD=$(New-Secret 16)"
-        "DB_ROOT_PASSWORD=$(New-Secret 16)"
+        "DB_PASSWORD=$(if ($existing[$node].DB_PASSWORD) { $existing[$node].DB_PASSWORD } else { New-Secret 16 })"
+        "DB_ROOT_PASSWORD=$(if ($existing[$node].DB_ROOT_PASSWORD) { $existing[$node].DB_ROOT_PASSWORD } else { New-Secret 16 })"
     )
     $path = "config/hosts/node-$($node.ToLower()).env"
     # LF konce riadkov – súbor sa použije aj na Linux VM
