@@ -4,11 +4,14 @@
 # Výsledok: config/hosts/node-c.env pošlite kamarátovi (súkromne – obsahuje replikačný token).
 #
 # Uzol B je v LAN dostupný cez tento PC (VirtualBox NAT port forwarding), takže netreba bridged sieť VM.
+# Ak bridged adaptér VM dostal v sieti vlastnú IP (napr. na hotspote), zadajte ju cez -VmLanIp –
+# uzol B potom vystupuje ako samostatný hostiteľ (port forwarding na niektorých sieťach nefunguje).
 # Ak -FriendIp = IP tohto PC, uzol C sa spustí lokálne (simulácia bez kamaráta).
 param(
     [Parameter(Mandatory)][string]$FriendIp,
     [string]$MyIp = '',
     [string]$VmName = 'dt-node-b',
+    [string]$VmLanIp = '',
     [switch]$SkipFirewall
 )
 $ErrorActionPreference = 'Stop'
@@ -21,7 +24,8 @@ if (-not $MyIp) {
         Select-Object -First 1).IPv4Address.IPAddress
     if (-not $MyIp) { throw 'Nepodarilo sa zistiť IP tohto PC – zadajte -MyIp.' }
 }
-Write-Host "Tento PC: $MyIp   Kamarátov PC: $FriendIp`n" -ForegroundColor Cyan
+$bIp = if ($VmLanIp) { $VmLanIp } else { $MyIp }
+Write-Host "Tento PC: $MyIp   VM (uzol B): $bIp   Kamarátov PC: $FriendIp`n" -ForegroundColor Cyan
 
 function Read-Env([string]$Path) {
     $values = @{}
@@ -30,13 +34,14 @@ function Read-Env([string]$Path) {
 }
 
 # 1. Konfigurácia (token a DB heslá sa zachovajú)
-& "$root\scripts\new-host-configs.ps1" -IpA $MyIp -IpB $MyIp -IpC $FriendIp | Out-Null
+& "$root\scripts\new-host-configs.ps1" -IpA $MyIp -IpB $bIp -IpC $FriendIp | Out-Null
 $a = Read-Env config\hosts\node-a.env
 $b = Read-Env config\hosts\node-b.env
 $c = Read-Env config\hosts\node-c.env
 
 # 2. Firewall tohto PC: A (UI + replikácia) a B (presmerované na VM). Vyžaduje administrátora – zobrazí sa UAC.
-$ports = @($a.UI_PORT, $a.PEER_PORT, $b.UI_PORT, $b.PEER_PORT)
+$ports = @($a.UI_PORT, $a.PEER_PORT)
+if (-not $VmLanIp) { $ports += @($b.UI_PORT, $b.PEER_PORT) }
 if ($FriendIp -eq $MyIp) { $ports += @($c.UI_PORT, $c.PEER_PORT) }
 $missing = @($ports | Where-Object { -not (Get-NetFirewallRule -DisplayName "DT uzol $_" -ErrorAction SilentlyContinue) })
 if ($missing -and -not $SkipFirewall) {
@@ -72,15 +77,17 @@ for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep 5
 }
 foreach ($rule in 'dt-ui', 'dt-peer') { & $vbm controlvm $VmName natpf1 delete $rule 2>$null | Out-Null }
-& $vbm controlvm $VmName natpf1 "dt-ui,tcp,,$($b.UI_PORT),,$($b.UI_PORT)"
-& $vbm controlvm $VmName natpf1 "dt-peer,tcp,,$($b.PEER_PORT),,$($b.PEER_PORT)"
+if (-not $VmLanIp) {
+    & $vbm controlvm $VmName natpf1 "dt-ui,tcp,,$($b.UI_PORT),,$($b.UI_PORT)"
+    & $vbm controlvm $VmName natpf1 "dt-peer,tcp,,$($b.PEER_PORT),,$($b.PEER_PORT)"
+}
 $ErrorActionPreference = 'Stop'
 & "$root\scripts\vm\deploy-to-vm.ps1" -VmName $VmName | Out-Null
-Write-Host "Uzol B: http://${MyIp}:$($b.UI_PORT)  (cez tento PC → VM)"
+Write-Host "Uzol B: http://${bIp}:$($b.UI_PORT)$(if (-not $VmLanIp) { '  (cez tento PC → VM)' })"
 
 # 6. Kontrola
 Write-Host "`nKontrola dostupnosti:" -ForegroundColor Cyan
-foreach ($n in @(@('A', $MyIp, $a.UI_PORT), @('B', $MyIp, $b.UI_PORT), @('C', $FriendIp, $c.UI_PORT))) {
+foreach ($n in @(@('A', $MyIp, $a.UI_PORT), @('B', $bIp, $b.UI_PORT), @('C', $FriendIp, $c.UI_PORT))) {
     try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 4 "http://$($n[1]):$($n[2])/health.php" | Out-Null; Write-Host "  $($n[0])  http://$($n[1]):$($n[2])  online" }
     catch { Write-Host "  $($n[0])  http://$($n[1]):$($n[2])  zatiaľ nedostupný" }
 }
