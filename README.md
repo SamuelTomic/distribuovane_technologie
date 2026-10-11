@@ -197,7 +197,7 @@ Skript urobí toto:
 * zastaví lokálny uzol C a prekonfiguruje uzol A,
 * sprístupní uzol B cez porty tohto PC (VirtualBox port forwarding, takže netreba bridged sieť),
 * vytvorí `config\hosts\node-c.env` pre druhý počítač.
-Postup pre druhý počítač je v [docs/uzol-c.md](docs/uzol-c.md).
+Postup pre druhý počítač je v [docs/uzol-c.md](docs/uzol-c.md), prompt pre Claude Code na druhom počítači v [docs/prompt-claude-uzol-c.md](docs/prompt-claude-uzol-c.md).
 
 ### 5. Centrálne logy pre viac hostiteľov (voliteľné)
 
