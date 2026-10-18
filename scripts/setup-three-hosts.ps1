@@ -76,16 +76,28 @@ for ($i = 0; $i -lt 30; $i++) {
     if ($LASTEXITCODE -eq 0) { break }
     Start-Sleep 5
 }
-foreach ($rule in 'dt-ui', 'dt-peer') { & $vbm controlvm $VmName natpf1 delete $rule 2>$null | Out-Null }
+foreach ($rule in 'dt-ui', 'dt-peer', 'dt-agent') { & $vbm controlvm $VmName natpf1 delete $rule 2>$null | Out-Null }
 if (-not $VmLanIp) {
     & $vbm controlvm $VmName natpf1 "dt-ui,tcp,,$($b.UI_PORT),,$($b.UI_PORT)"
     & $vbm controlvm $VmName natpf1 "dt-peer,tcp,,$($b.PEER_PORT),,$($b.PEER_PORT)"
+    & $vbm controlvm $VmName natpf1 "dt-agent,tcp,,$($b.AGENT_PORT),,$($b.AGENT_PORT)"
 }
 $ErrorActionPreference = 'Stop'
 & "$root\scripts\vm\deploy-to-vm.ps1" -VmName $VmName | Out-Null
 Write-Host "Uzol B: http://${bIp}:$($b.UI_PORT)$(if (-not $VmLanIp) { '  (cez tento PC → VM)' })"
 
-# 6. Kontrola
+# 6. Centrálne logy: Dozzle UI na tomto PC pripojené na agentov všetkých troch uzlov
+$agentPort = { param($cfg) if ($cfg.AGENT_PORT) { $cfg.AGENT_PORT } else { '7007' } }
+# Agenti na tomto PC sú dostupní cez host.docker.internal (spojenie na vlastnú LAN IP blokuje firewall)
+$agentHost = { param($ip) if ($ip -eq $MyIp) { 'host.docker.internal' } else { $ip } }
+$env:DOZZLE_AGENTS = (@("$(& $agentHost $MyIp):$(& $agentPort $a)", "$(& $agentHost $bIp):$(& $agentPort $b)", "$(& $agentHost $FriendIp):$(& $agentPort $c)") | Select-Object -Unique) -join ','
+$ErrorActionPreference = 'Continue'
+docker compose -f docker-compose.monitoring.yml down 2>&1 | Out-Null
+docker compose -f docker-compose.monitoring.yml up -d 2>&1 | Out-Null
+$ErrorActionPreference = 'Stop'
+Write-Host "Centrálne logy: http://localhost:8099  (agenti: $env:DOZZLE_AGENTS)"
+
+# 7. Kontrola
 Write-Host "`nKontrola dostupnosti:" -ForegroundColor Cyan
 foreach ($n in @(@('A', $MyIp, $a.UI_PORT), @('B', $bIp, $b.UI_PORT), @('C', $FriendIp, $c.UI_PORT))) {
     try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 4 "http://$($n[1]):$($n[2])/health.php" | Out-Null; Write-Host "  $($n[0])  http://$($n[1]):$($n[2])  online" }

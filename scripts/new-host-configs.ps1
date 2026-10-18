@@ -40,7 +40,7 @@ $perHost = @{}
 foreach ($node in $ips.Keys) {
     $offset = 100 * [int]$perHost[$ips[$node]]
     $perHost[$ips[$node]] = [int]$perHost[$ips[$node]] + 1
-    $ports[$node] = @{ Ui = $UiPort + $offset; Peer = $PeerPort + $offset }
+    $ports[$node] = @{ Ui = $UiPort + $offset; Peer = $PeerPort + $offset; Agent = 7007 + $offset }
 }
 
 foreach ($node in $ips.Keys) {
@@ -52,6 +52,10 @@ foreach ($node in $ips.Keys) {
         "COMPOSE_PROJECT_NAME=dt-node-$($node.ToLower())"
         "UI_PORT=$($ports[$node].Ui)"
         "PEER_PORT=$($ports[$node].Peer)"
+        "AGENT_PORT=$($ports[$node].Agent)"
+        "NODE_SUBNET=10.201.$([int][char]$node - 64).0/24"
+        "# Centrálne logy: spustí aj Dozzle agenta (docker-compose.monitoring.yml)"
+        "COMPOSE_PROFILES=logging"
         "PEER_NODES=$peers"
         'APP_VERSION=1.0.0'
         "# Token musí byť rovnaký na všetkých uzloch; DB heslá sú lokálne pre uzol."

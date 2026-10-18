@@ -1,7 +1,8 @@
-# Centrálne logovanie pre viac hostiteľov: Dozzle UI sa pripojí na agentov na každom uzle.
-# Na každom uzle: docker compose -f docker-compose.node.yml --env-file config/hosts/node-X.env --profile logging up -d
-# Centrálne (napr. na PC):  $env:DOZZLE_AGENTS="192.168.56.101:7007,192.168.56.102:7007,192.168.56.103:7007"
-#                           docker compose -f docker-compose.monitoring.yml up -d   → http://localhost:8099
+# Centrálne logovanie pre viac hostiteľov: Dozzle UI sa pripojí na Dozzle agentov na každom uzle.
+# Agent beží na každom uzle automaticky (COMPOSE_PROFILES=logging v config/hosts/node-X.env, port AGENT_PORT).
+# Spúšťa ho scripts/setup-three-hosts.ps1, ručne:
+#   $env:DOZZLE_AGENTS = "172.20.10.2:7007,172.20.10.11:7007,172.20.10.7:7007"
+#   docker compose -f docker-compose.monitoring.yml up -d      → http://localhost:8099
 name: dt-monitoring
 
 services:
@@ -10,4 +11,15 @@ services:
     environment:
       DOZZLE_REMOTE_AGENT: ${DOZZLE_AGENTS:?Nastavte DOZZLE_AGENTS=ip1:7007,ip2:7007,ip3:7007}
     ports: ["8099:8080"]
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.201.250.0/24

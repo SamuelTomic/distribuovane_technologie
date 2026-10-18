@@ -6,6 +6,10 @@
 #
 # Porty: UI_PORT = webové rozhranie pre ľudí, PEER_PORT = replikácia medzi uzlami.
 # Oddelené porty umožňujú simulovať výpadok firewallom (scripts/partition.*) a obmedziť replikáciu na IP peerov.
+#
+# Obnova kontajnerov: restart: unless-stopped reštartuje spadnutý kontajner; služba autoheal navyše
+# reštartuje kontajner, ktorý beží, ale health check ho hlási ako unhealthy (napr. zaseknutý worker).
+# Centrálne logy: dozzle-agent (zapína sa cez COMPOSE_PROFILES=logging v konfigurácii uzla).
 name: dt-node
 
 x-logging: &logging
@@ -16,6 +20,7 @@ x-logging: &logging
 
 x-app: &app
   image: dt-node:${APP_VERSION:-1.0.0}
+  labels: { autoheal: "true" }
   build:
     context: .
     args:
@@ -40,6 +45,7 @@ x-app: &app
 services:
   db:
     image: mysql:8.4
+    labels: { autoheal: "true" }
     environment:
       MYSQL_DATABASE: poruchy
       MYSQL_USER: app
@@ -77,6 +83,7 @@ services:
 
   web:
     image: nginx:1.27-alpine
+    labels: { autoheal: "true" }
     environment: { APP_HOST: app }
     volumes:
       - ./docker/gateway.conf.template:/etc/nginx/templates/default.conf.template:ro
@@ -93,7 +100,20 @@ services:
     restart: unless-stopped
     logging: *logging
 
-  # Voliteľné: agent pre centrálne logy (docker-compose.monitoring.yml). Zapnutie: --profile logging
+  # Reštartuje kontajnery s labelom autoheal=true, keď ich health check hlási unhealthy.
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    network_mode: none   # sieť nepotrebuje – s Dockerom komunikuje cez socket
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: 5
+      AUTOHEAL_START_PERIOD: 30
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    logging: *logging
+
+  # Agent pre centrálne logy (docker-compose.monitoring.yml). Zapnutie: COMPOSE_PROFILES=logging alebo --profile logging
   dozzle-agent:
     image: amir20/dozzle:${DOZZLE_VERSION:-v8.14.4}
     command: agent
@@ -102,7 +122,8 @@ services:
       DOZZLE_FILTER: label=com.docker.compose.project=${COMPOSE_PROJECT_NAME:-dt-node}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    ports: ["7007:7007"]
+    ports: ["${AGENT_PORT:-7007}:7007"]
+    networks: [node]
     profiles: [logging]
     restart: unless-stopped
     logging: *logging
@@ -111,4 +132,8 @@ volumes:
   db_data:
 
 networks:
+  # Pevný rozsah, aby nekolidoval s LAN/hotspotom (Docker inak berie 172.x.0.0/16, napr. 172.20 = iPhone hotspot).
   node:
+    ipam:
+      config:
+        - subnet: ${NODE_SUBNET:-10.201.0.0/24}

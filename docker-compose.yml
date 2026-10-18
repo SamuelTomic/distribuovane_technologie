@@ -11,6 +11,7 @@ x-logging: &logging
 
 x-app: &app
   image: dt-node:${APP_VERSION:-1.0.0}
+  labels: { autoheal: "true" }
   build:
     context: .
     args:
@@ -41,6 +42,7 @@ x-worker: &worker
 
 x-gateway: &gateway
   image: nginx:1.27-alpine
+  labels: { autoheal: "true" }
   volumes:
     - ./docker/gateway.conf.template:/etc/nginx/templates/default.conf.template:ro
   healthcheck:
@@ -53,6 +55,7 @@ x-gateway: &gateway
 
 x-db: &db
   image: mysql:8.4
+  labels: { autoheal: "true" }
   environment:
     MYSQL_DATABASE: poruchy
     MYSQL_USER: app
@@ -133,6 +136,19 @@ services:
     env_file: config/local/node-c.env
     depends_on: { node-c-db: { condition: service_healthy } }
     networks: [node-c-private, replication]
+
+  # ---------------- Obnova nezdravých kontajnerov ----------------
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    network_mode: none
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: 5
+      AUTOHEAL_START_PERIOD: 30
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    logging: *logging
 
   # ---------------- Centralizované logy ----------------
   dozzle:

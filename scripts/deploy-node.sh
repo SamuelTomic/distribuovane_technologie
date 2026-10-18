@@ -8,7 +8,12 @@ cd "$(dirname "$0")/.."
 
 env_value() { grep "^$1=" "$ENV_FILE" | cut -d= -f2- | tr -d '\r'; }
 
-docker compose -f docker-compose.node.yml --env-file "$ENV_FILE" up -d --build --wait --wait-timeout 600
+if ! docker compose -f docker-compose.node.yml --env-file "$ENV_FILE" up -d --build --wait --wait-timeout 600 --remove-orphans; then
+    # Napr. zmenená konfigurácia siete – kontajnery a sieť vytvoríme nanovo (volume s dátami ostáva).
+    echo "Prvý pokus zlyhal, vytváram kontajnery a sieť nanovo (dáta ostávajú)..."
+    docker compose -f docker-compose.node.yml --env-file "$ENV_FILE" down --remove-orphans
+    docker compose -f docker-compose.node.yml --env-file "$ENV_FILE" up -d --build --wait --wait-timeout 600
+fi
 docker compose -f docker-compose.node.yml --env-file "$ENV_FILE" ps
 
 UI_PORT=$(env_value UI_PORT)
